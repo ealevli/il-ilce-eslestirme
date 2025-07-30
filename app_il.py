@@ -35,76 +35,84 @@ if not api_key:
     st.stop()
 
 
-# --- Orijinal Fonksiyonlarınız (Streamlit için küçük düzenlemelerle) ---
+# --- Fonksiyonlar ---
 
-# Geopy ve ORS istemcilerini bir kere oluştur
+# Geopy ve ORS istemcilerini bir kere oluşturup cache'le
 @st.cache_resource
 def get_clients(key):
+    """API anahtarına göre geopy ve openrouteservice istemcilerini oluşturur."""
     geolocator = Nominatim(user_agent="streamlit_geolocator_app")
     ors_client = openrouteservice.Client(key=key)
     return geolocator, ors_client
 
 geolocator, ors_client = get_clients(api_key)
 
-
-def temizle_il_adi(text):
-    if not text: return None
+# DÜZENLENDİ: İki fonksiyon yerine tek, birleştirilmiş ve doğru çalışan bir fonksiyon
+def temizle_lokasyon_adi(text):
+    """İl veya ilçe adlarındaki 'merkez', 'belediye' gibi istenmeyen ifadeleri temizler."""
+    if not isinstance(text, str):
+        return None
     text = text.strip()
     text = re.sub(r'\bmerkez\b', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\bbelediyesi\b', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\bbelediye\b', '', text, flags=re.IGNORECASE)
+    # Temizlik sonrası oluşan çift boşlukları tek boşluğa indirir
     text = re.sub(r'\s{2,}', ' ', text)
+    # Baş harfleri büyütür ve kenar boşluklarını son bir kez daha alır
     return text.title().strip()
 
 
-def temizle_il_ilce_adi(text):
-    if not text: return None
-    text = text.strip()
-    text = re.sub(r'\bbelediyesi\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bbelediye\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\s{2,}', ' ', text)
-    return text.title().strip()
-
-
-def get_city_district(lat, lon):
+@st.cache_data
+def get_city_district(_geolocator, lat, lon):
+    """Verilen koordinatlar için il ve ilçe bilgisini alır ve temizler."""
     try:
-        location = geolocator.reverse((lat, lon), language='tr', timeout=10)
-        sleep(1) # Nominatim kullanım politikasına uymak için
+        # Nominatim kullanım politikasına uymak için istekler arası bekleme
+        sleep(1) 
+        location = _geolocator.reverse((lat, lon), language='tr', timeout=10)
         address = location.raw.get('address', {})
+        
+        # Olası tüm anahtarları kontrol et
         raw_city = address.get('province') or address.get('state')
         raw_district = address.get('county') or address.get('town') or address.get('district') or address.get('suburb')
-        city = temizle_il_adi(raw_city)
-        district = temizle_il_ilce_adi(raw_district)
-        return pd.Series([city, district])
+        
+        # DÜZENLENDİ: Tek ve doğru temizleme fonksiyonunu kullan
+        city = temizle_lokasyon_adi(raw_city)
+        district = temizle_lokasyon_adi(raw_district)
+        
+        return city, district
     except Exception as e:
-        return pd.Series([f"Hata: {e}", None])
+        st.error(f"Adres bulma hatası (Lat: {lat}, Lon: {lon}): {e}")
+        return f"Hata", "Hata"
 
 
-def hesapla_lineer_mesafe(row):
+def hesapla_mesafeler(row):
+    """Tek bir satır için lineer ve reel yol mesafesini hesaplar."""
     try:
         vaka_koord = (row['VAKA Lat'], row['VAKA Long'])
         bayi_koord = (row['Bayi Enlem'], row['Bayi Boylam'])
-        return round(geodesic(vaka_koord, bayi_koord).km, 2)
-    except Exception:
-        return None
-
-
-def hesapla_reel_yol_mesafesi(row):
-    try:
-        start = (row['VAKA Long'], row['VAKA Lat'])
-        end = (row['Bayi Boylam'], row['Bayi Enlem'])
+        
+        # Lineer Mesafe
+        lineer_mesafe = round(geodesic(vaka_koord, bayi_koord).km, 2)
+        
+        # Reel Yol Mesafesi
+        start_coords = (row['VAKA Long'], row['VAKA Lat'])
+        end_coords = (row['Bayi Boylam'], row['Bayi Enlem'])
+        
         response = ors_client.directions(
-            coordinates=[start, end],
+            coordinates=[start_coords, end_coords],
             profile='driving-car',
             format='geojson',
             preference='fastest'
         )
         mesafe_metre = response['features'][0]['properties']['segments'][0]['distance']
-        return round(mesafe_metre / 1000, 2)
-    except Exception:
-        return None
+        reel_mesafe = round(mesafe_metre / 1000, 2)
+        
+        return lineer_mesafe, reel_mesafe
+    except Exception as e:
+        st.warning(f"Mesafe hesaplama hatası (Satır {row.name}): {e}")
+        return None, None
 
-# --- Dosya Yükleme Alanı ---
+# --- Dosya Yükleme ve Ana İşlem ---
 uploaded_file = st.file_uploader(
     "İşlem Yapılacak Excel Dosyasını Yükleyin",
     type=["xlsx"],
@@ -112,45 +120,39 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file is not None:
-    df = pd.read_excel(uploaded_file)
+    df_original = pd.read_excel(uploaded_file)
     st.subheader("Yüklenen Veri Önizlemesi")
-    st.dataframe(df.head())
+    st.dataframe(df_original.head())
 
-    # --- Hesaplamayı Başlatma Butonu ---
     if st.button("✅ Analizi Başlat", type="primary"):
-        total_rows = len(df)
-        results = []
+        total_rows = len(df_original)
+        df_result = df_original.copy()
+        
+        # Yeni sütunları başlangıçta boş olarak ekle
+        df_result['Bulunan İl'] = ""
+        df_result['Bulunan İlçe'] = ""
+        df_result['Lineer Mesafe (km)'] = 0.0
+        df_result['Reel Yol Mesafesi (km)'] = 0.0
 
-        # Status ve progress bar ile kullanıcıyı bilgilendir
-        with st.status("Hesaplamalar yapılıyor, lütfen bekleyin...", expanded=True) as status:
-            progress_bar = st.progress(0, text="Başlatılıyor...")
+        progress_bar = st.progress(0, text="Başlatılıyor...")
+        
+        for index, row in df_result.iterrows():
+            # İl/İlçe bul
+            il, ilce = get_city_district(geolocator, row['VAKA Lat'], row['VAKA Long'])
+            df_result.at[index, 'Bulunan İl'] = il
+            df_result.at[index, 'Bulunan İlçe'] = ilce
             
-            for index, row in df.iterrows():
-                # İl/İlçe bul
-                il_ilce = get_city_district(row['VAKA Lat'], row['VAKA Long'])
-                
-                # Mesafeleri hesapla
-                lineer_mesafe = hesapla_lineer_mesafe(row)
-                reel_mesafe = hesapla_reel_yol_mesafesi(row)
+            # Mesafeleri hesapla
+            lineer_mesafe, reel_mesafe = hesapla_mesafeler(row)
+            df_result.at[index, 'Lineer Mesafe (km)'] = lineer_mesafe
+            df_result.at[index, 'Reel Yol Mesafesi (km)'] = reel_mesafe
+            
+            # İlerleme durumunu güncelle
+            progress_percent = (index + 1) / total_rows
+            progress_bar.progress(progress_percent, text=f"Satır {index + 1}/{total_rows} işleniyor...")
 
-                # Sonuçları birleştir
-                processed_row = {
-                    **row.to_dict(),
-                    'Bulunan İl': il_ilce[0],
-                    'Bulunan İlçe': il_ilce[1],
-                    'Lineer Mesafe (km)': lineer_mesafe,
-                    'Reel Yol Mesafesi (km)': reel_mesafe
-                }
-                results.append(processed_row)
-
-                # İlerleme durumunu güncelle
-                progress_percent = (index + 1) / total_rows
-                progress_bar.progress(progress_percent, text=f"Satır {index + 1}/{total_rows} işleniyor...")
-
-            status.update(label="✅ Hesaplamalar tamamlandı!", state="complete", expanded=False)
-
-        # Sonuçları DataFrame'e dönüştür
-        df_result = pd.DataFrame(results)
+        progress_bar.empty()
+        st.success("✅ Hesaplamalar tamamlandı!")
 
         st.subheader("Sonuçlar")
         st.dataframe(df_result)
@@ -161,8 +163,7 @@ if uploaded_file is not None:
             output = BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 df.to_excel(writer, index=False, sheet_name='Sonuclar')
-            processed_data = output.getvalue()
-            return processed_data
+            return output.getvalue()
 
         excel_data = convert_df_to_excel(df_result)
         st.download_button(
