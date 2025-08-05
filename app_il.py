@@ -1,131 +1,174 @@
+import streamlit as st
 import pandas as pd
 from geopy.geocoders import Nominatim
 from geopy.distance import geodesic
-from time import sleep
 import openrouteservice
 import re
+from io import BytesIO
+from time import sleep
 
-# 1. Excel dosyasını oku
-df = pd.read_excel("test.xlsx")
-print("✅ Excel dosyası okundu:", df.columns)
-
-# 2. Geopy ayarı
-geolocator = Nominatim(user_agent="adres_bulucu_test")
-
-# 3. OpenRouteService istemcisi
-ors_client = openrouteservice.Client(
-    key="eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjQ5NzRhMWI5MWI1NDQ1YzQ5OGYzNzg0MWM4YjczZTE3IiwiaCI6Im11cm11cjY0In0="
+# --- Sayfa Yapılandırması ve Başlık ---
+st.set_page_config(page_title="Mesafe ve Lokasyon Analiz Aracı", layout="wide")
+st.title("🗺️ Mesafe ve Lokasyon Analiz Aracı")
+st.info(
+    "Bu uygulama, yüklediğiniz Excel dosyasındaki 'VAKA' ve 'Bayi' koordinatları arasında kuş uçuşu ve karayolu mesafesini hesaplar. "
+    "Ayrıca VAKA koordinatlarına göre İl/İlçe tespiti yapar."
 )
 
-# 4. Temizleme fonksiyonları
-def temizle_il_adi(text):
-    if not text:
+# --- API Anahtarı Yönetimi ---
+st.sidebar.header("Ayarlar")
+# Streamlit Secrets'tan anahtarı almayı dene
+try:
+    default_key = st.secrets["ORS_KEY"]
+except (FileNotFoundError, KeyError):
+    default_key = ""
+
+api_key = st.sidebar.text_input(
+    "OpenRouteService API Anahtarı",
+    type="password",
+    value=default_key,
+    help="API anahtarınızı https://openrouteservice.org/dev/#/home adresinden alabilirsiniz."
+)
+
+if not api_key:
+    st.warning("Lütfen devam etmek için sol menüden OpenRouteService API anahtarınızı girin.")
+    st.stop()
+
+
+# --- Fonksiyonlar ---
+
+# Geopy ve ORS istemcilerini bir kere oluşturup cache'le
+@st.cache_resource
+def get_clients(key):
+    """API anahtarına göre geopy ve openrouteservice istemcilerini oluşturur."""
+    geolocator = Nominatim(user_agent="streamlit_geolocator_app")
+    ors_client = openrouteservice.Client(key=key)
+    return geolocator, ors_client
+
+geolocator, ors_client = get_clients(api_key)
+
+# DÜZENLENDİ: İki fonksiyon yerine tek, birleştirilmiş ve doğru çalışan bir fonksiyon
+def temizle_lokasyon_adi(text):
+    """İl veya ilçe adlarındaki 'merkez', 'belediye' gibi istenmeyen ifadeleri temizler."""
+    if not isinstance(text, str):
         return None
     text = text.strip()
     text = re.sub(r'\bmerkez\b', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\bbelediyesi\b', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\bbelediye\b', '', text, flags=re.IGNORECASE)
+    # Temizlik sonrası oluşan çift boşlukları tek boşluğa indirir
     text = re.sub(r'\s{2,}', ' ', text)
+    # Baş harfleri büyütür ve kenar boşluklarını son bir kez daha alır
     return text.title().strip()
 
-def temizle_il_ilce_adi(text):
-    if not text:
-        return None
-    text = text.strip()
-    text = re.sub(r'\bbelediyesi\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bbelediye\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\s{2,}', ' ', text)
-    return text.title().strip()
 
-# 5. İl ve ilçe bulma fonksiyonu (temizlenmiş)
-def get_city_district(lat, lon):
+@st.cache_data
+def get_city_district(_geolocator, lat, lon):
+    """Verilen koordinatlar için il ve ilçe bilgisini alır ve temizler."""
     try:
-        location = geolocator.reverse((lat, lon), language='tr')
-        sleep(1)
+        # Nominatim kullanım politikasına uymak için istekler arası bekleme
+        sleep(1) 
+        location = _geolocator.reverse((lat, lon), language='tr', timeout=10)
         address = location.raw.get('address', {})
-
-        raw_city = (
-            address.get('city') or
-            address.get('province') or
-            address.get('state') or
-            address.get('region')
-        )
-        raw_district = (
-            address.get('town') or
-            address.get('county') or
-            address.get('district') or
-            address.get('suburb')
-        )
-
-        city = temizle_il_adi(raw_city)
-        district = temizle_il_ilce_adi(raw_district)
-
-        # Eğer il ve ilçe benzerse, ilçe'yi ilin adı yap
-        if district and (district == city or "Merkez" in district):
-            district = city
-
-        print(f"✔️ Temizlendi: İl = {city}, İlçe = {district}")
-        return pd.Series([city, district])
-
+        
+        # Olası tüm anahtarları kontrol et
+        raw_city = address.get('province') or address.get('state')
+        raw_district = address.get('county') or address.get('town') or address.get('district') or address.get('suburb')
+        
+        # DÜZENLENDİ: Tek ve doğru temizleme fonksiyonunu kullan
+        city = temizle_lokasyon_adi(raw_city)
+        district = temizle_lokasyon_adi(raw_district)
+        
+        return city, district
     except Exception as e:
-        print("❌ İl/ilçe hatası:", e)
-        return pd.Series([None, None])
+        st.error(f"Adres bulma hatası (Lat: {lat}, Lon: {lon}): {e}")
+        return f"Hata", "Hata"
 
-# 6. İl ve ilçe sütunlarını ekle
-df[['Bulunan İl', 'Bulunan İlçe']] = df.apply(
-    lambda row: get_city_district(row['VAKA Lat'], row['VAKA Long']), axis=1
-)
 
-# 7. Lineer (kuş uçuşu) mesafe hesaplama
-def hesapla_lineer_mesafe(row):
+def hesapla_mesafeler(row):
+    """Tek bir satır için lineer ve reel yol mesafesini hesaplar."""
     try:
         vaka_koord = (row['VAKA Lat'], row['VAKA Long'])
         bayi_koord = (row['Bayi Enlem'], row['Bayi Boylam'])
-        mesafe = geodesic(vaka_koord, bayi_koord).km
-        return round(mesafe, 3)
-    except Exception as e:
-        print("❌ Lineer mesafe hatası:", e)
-        return None
-
-df['Lineer Mesafe (km)'] = df.apply(hesapla_lineer_mesafe, axis=1)
-
-# 8. Reel (arabayla) yol mesafesi hesaplama
-def hesapla_reel_yol_mesafesi(row):
-    try:
-        start = (row['VAKA Long'], row['VAKA Lat'])
-        end = (row['Bayi Boylam'], row['Bayi Enlem'])
-
+        
+        # Lineer Mesafe
+        lineer_mesafe = round(geodesic(vaka_koord, bayi_koord).km, 2)
+        
+        # Reel Yol Mesafesi
+        start_coords = (row['VAKA Long'], row['VAKA Lat'])
+        end_coords = (row['Bayi Boylam'], row['Bayi Enlem'])
+        
         response = ors_client.directions(
-            coordinates=[start, end],
+            coordinates=[start_coords, end_coords],
             profile='driving-car',
             format='geojson',
-            preference='fastest'  # Gerçeğe daha yakın sonuç
+            preference='fastest'
         )
-
-        # Güvenli kontrol: Tüm anahtarlar mevcut mu
-        if (
-            'features' in response and
-            len(response['features']) > 0 and
-            'properties' in response['features'][0] and
-            'segments' in response['features'][0]['properties'] and
-            len(response['features'][0]['properties']['segments']) > 0
-        ):
-            mesafe_metre = response['features'][0]['properties']['segments'][0]['distance']
-            mesafe_km = mesafe_metre / 1000
-            print(f"🚗 Reel Yol Mesafesi: {mesafe_km:.2f} km")
-            return round(mesafe_km, 2)
-        else:
-            print("❌ ORS yanıtı beklenen formatta değil")
-            return None
-
+        mesafe_metre = response['features'][0]['properties']['segments'][0]['distance']
+        reel_mesafe = round(mesafe_metre / 1000, 2)
+        
+        return lineer_mesafe, reel_mesafe
     except Exception as e:
-        print("❌ Reel mesafe hatası:", e)
-        return None
+        st.warning(f"Mesafe hesaplama hatası (Satır {row.name}): {e}")
+        return None, None
 
-df['Reel Yol Mesafesi (km)'] = df.apply(hesapla_reel_yol_mesafesi, axis=1)
+# --- Dosya Yükleme ve Ana İşlem ---
+uploaded_file = st.file_uploader(
+    "İşlem Yapılacak Excel Dosyasını Yükleyin",
+    type=["xlsx"],
+    help="Dosyanızda 'VAKA Lat', 'VAKA Long', 'Bayi Enlem', 'Bayi Boylam' sütunları bulunmalıdır."
+)
 
-# 9. Sonucu kaydet
-df.to_excel("test_sonuc.xlsx", index=False)
-print("✅ Tam işlem tamamlandı. Dosya: test_sonuc.xlsx")
+if uploaded_file is not None:
+    df_original = pd.read_excel(uploaded_file)
+    st.subheader("Yüklenen Veri Önizlemesi")
+    st.dataframe(df_original.head())
 
+    if st.button("✅ Analizi Başlat", type="primary"):
+        total_rows = len(df_original)
+        df_result = df_original.copy()
+        
+        # Yeni sütunları başlangıçta boş olarak ekle
+        df_result['Bulunan İl'] = ""
+        df_result['Bulunan İlçe'] = ""
+        df_result['Lineer Mesafe (km)'] = 0.0
+        df_result['Reel Yol Mesafesi (km)'] = 0.0
 
+        progress_bar = st.progress(0, text="Başlatılıyor...")
+        
+        for index, row in df_result.iterrows():
+            # İl/İlçe bul
+            il, ilce = get_city_district(geolocator, row['VAKA Lat'], row['VAKA Long'])
+            df_result.at[index, 'Bulunan İl'] = il
+            df_result.at[index, 'Bulunan İlçe'] = ilce
+            
+            # Mesafeleri hesapla
+            lineer_mesafe, reel_mesafe = hesapla_mesafeler(row)
+            df_result.at[index, 'Lineer Mesafe (km)'] = lineer_mesafe
+            df_result.at[index, 'Reel Yol Mesafesi (km)'] = reel_mesafe
+            
+            # İlerleme durumunu güncelle
+            progress_percent = (index + 1) / total_rows
+            progress_bar.progress(progress_percent, text=f"Satır {index + 1}/{total_rows} işleniyor...")
+
+        progress_bar.empty()
+        st.success("✅ Hesaplamalar tamamlandı!")
+
+        st.subheader("Sonuçlar")
+        st.dataframe(df_result)
+
+        # --- Sonuçları İndirme Butonu ---
+        @st.cache_data
+        def convert_df_to_excel(df):
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name='Sonuclar')
+            return output.getvalue()
+
+        excel_data = convert_df_to_excel(df_result)
+        st.download_button(
+            label="📥 Sonuçları Excel Olarak İndir",
+            data=excel_data,
+            file_name=f"sonuc_{uploaded_file.name}",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
