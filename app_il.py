@@ -18,43 +18,42 @@ def apply_custom_styling(image_file):
     try:
         with open(image_file, "rb") as f:
             encoded_string = base64.b64encode(f.read()).decode()
-       st.markdown(
-    f"""
-    <style>
-    /* Ana Arka Plan */
-    .stApp {{
-        background-image: url(data:image/{"jpg"};base64,{encoded_string});
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-attachment: fixed;
-        background-position: center;
-    }}
+            st.markdown(
+                f"""
+                <style>
+                /* Ana Arka Plan Ayarları */
+                .stApp {{
+                    background-image: url(data:image/{"jpg"};base64,{encoded_string});
+                    background-size: cover;
+                    background-repeat: no-repeat;
+                    background-attachment: fixed;
+                    background-position: center;
+                }}
 
-    /* Başlık okunabilirliği */
-    h1 {{
-        color: #FFFFFF;
-        text-shadow: 2px 2px 8px rgba(0,0,0,0.9);
-    }}
+                /* Başlık için okunabilirliği artıran gölge efekti */
+                h1 {{
+                    color: #FFFFFF;
+                    text-shadow: 2px 2px 8px rgba(0,0,0,0.9);
+                }}
 
-    /* Bilgi kutusu (st.info) için opak mavi arka plan ve beyaz yazı */
-    [data-testid="stInfo"] {{
-        background-color: #1565C0 !important;  /* Mavi ve opak */
-        border: 1px solid #0E2A54;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        color: white !important;
-    }}
-    [data-testid="stInfo"] p {{
-        color: white !important;
-    }}
-    </style>
-    """,
-    unsafe_allow_html=True
-
-
-        )
+                /* Bilgi kutusu (st.info) için opak mavi arka plan ve beyaz yazı */
+                [data-testid="stInfo"] {{
+                    background-color: #1565C0 !important;
+                    border: 1px solid #0E2A54;
+                    border-radius: 0.5rem;
+                    padding: 1rem;
+                    color: white !important;
+                }}
+                [data-testid="stInfo"] p {{
+                    color: white !important;
+                }}
+                </style>
+                """,
+                unsafe_allow_html=True
+            )
     except FileNotFoundError:
         st.error(f"'{image_file}' adlı arka plan dosyası bulunamadı. Lütfen dosyanın doğru klasörde olduğundan emin olun.")
+
 
 
 # --- Sayfa Yapılandırması ve Başlık ---
@@ -259,4 +258,5 @@ if uploaded_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
+
 
