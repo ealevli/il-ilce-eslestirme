@@ -59,7 +59,7 @@ def apply_custom_styling(image_file):
 st.set_page_config(page_title="Gelişmiş Mesafe ve Lokasyon Analiz Aracı", layout="wide")
 
 # Arka plan resmini ve yeni stilleri uygula
-apply_custom_styling('arkplan.jpg')
+apply_custom_styling('arkaplan.jpg')
 
 st.title("🗺️ Gelişmiş Mesafe ve Lokasyon Analiz Aracı")
 st.info(
@@ -263,3 +263,4 @@ if uploaded_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
+
