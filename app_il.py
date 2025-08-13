@@ -14,7 +14,7 @@ st.set_page_config(page_title="Gelişmiş Mesafe ve Lokasyon Analiz Aracı", lay
 st.title("🗺️ Gelişmiş Mesafe ve Lokasyon Analiz Aracı")
 st.info(
     "Bu uygulama, yüklediğiniz Excel dosyasındaki 'VAKA' ve 'Bayi' koordinatları arasında kuş uçuşu ve karayolu mesafesini hesaplar. "
-    "Ayrıca VAKA koordinatlarına göre İl/İlçe tespiti yapar ve zorlu lokasyonları bulmak için gelişmiş yöntemler kullanır."
+    "Ayrıca VAKA koordinatlarına göre İl/İlçe tespiti yapar."
 )
 
 # --- API Anahtarı Yönetimi ---
@@ -254,3 +254,4 @@ if uploaded_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
+
