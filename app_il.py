@@ -8,70 +8,73 @@ import re
 from io import BytesIO
 from time import sleep
 import uuid
-import base64 # Resim için eklendi
+import base64 # Resim için gerekli
 
-def add_bg_from_local(image_file):
+def apply_custom_styling(image_file):
     """
-    Lokal bir dosyadan Base64 formatında arka plan resmi ekler ve okunabilirlik için stil ayarları yapar.
+    Lokal bir dosyadan Base64 formatında arka plan resmi ekler ve
+    tüm ana içerik alanını okunabilir hale getirmek için stil ayarları yapar.
     """
-    with open(image_file, "rb") as image_file:
-        encoded_string = base64.b64encode(image_file.read()).decode()
-    st.markdown(
-    f"""
-    <style>
-    /* Ana Arka Plan Ayarları */
-    .stApp {{
-        background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url(data:image/{"jpg"};base64,{encoded_string});
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-attachment: fixed;
-        background-position: center;
-    }}
-    
-    /* Sidebar'ı daha okunaklı yapmak için yarı şeffaf arka plan */
-    [data-testid="stSidebar"] > div:first-child {{
-        background-color: rgba(38, 39, 48, 0.8);
-    }}
+    try:
+        with open(image_file, "rb") as f:
+            encoded_string = base64.b64encode(f.read()).decode()
+        st.markdown(
+        f"""
+        <style>
+        /* Ana Arka Plan Ayarları */
+        .stApp {{
+            background-image: url(data:image/{"jpg"};base64,{encoded_string});
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-position: center;
+        }}
 
-    /* --- YENİ EKLENEN KISIM: BİLDİRİM KUTULARI İÇİN STİLLER --- */
+        /* --- YENİ VE GARANTİLİ YÖNTEM --- */
+        /* Ana içerik alanı için yarı şeffaf "cam panel" efekti */
+        [data-testid="stAppViewContainer"] > .main .block-container {{
+            background-color: rgba(10, 15, 25, 0.85); /* Koyu lacivert, yarı şeffaf */
+            padding: 2rem;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }}
 
-    /* Bilgi kutusu (st.info) için opak, koyu mavi arka plan */
-    [data-testid="stInfo"] {{
-        background-color: #0E2A54; /* Koyu Mavi */
-        color: white; /* Beyaz yazı rengi */
-        border: 1px solid #0E2A54;
-    }}
+        /* Sidebar'ı daha okunaklı yapmak */
+        [data-testid="stSidebar"] > div:first-child {{
+            background-color: rgba(10, 15, 25, 0.85);
+            border-right: 1px solid rgba(255, 255, 255, 0.2);
+        }}
 
-    /* Başarı kutusu (st.success) için opak, koyu yeşil arka plan */
-    [data-testid="stSuccess"] {{
-        background-color: #05380b; /* Koyu Yeşil */
-        color: white;
-        border: 1px solid #05380b;
-    }}
+        /* Tüm metin renklerini beyaz yaparak okunabilirliği artır */
+        h1, h2, h3, h4, h5, h6, p, .st-emotion-cache-16idsys p, label {{
+            color: #FFFFFF !important;
+        }}
+        
+        /* Buton ve diğer elementlerin stillerini ayarla */
+        .stButton>button {{
+            color: #FFFFFF;
+            background-color: #007bff;
+            border: none;
+        }}
+        .stButton>button:hover {{
+            background-color: #0056b3;
+            color: #FFFFFF;
+        }}
 
-    /* Uyarı kutusu (st.warning) için opak, koyu turuncu arka plan */
-    [data-testid="stWarning"] {{
-        background-color: #7B341E; /* Koyu Turuncu/Kiremit */
-        color: white;
-        border: 1px solid #7B341E;
-    }}
+        </style>
+        """,
+        unsafe_allow_html=True
+        )
+    except FileNotFoundError:
+        st.error(f"'{image_file}' adlı arka plan dosyası bulunamadı. Lütfen dosyanın doğru klasörde olduğundan emin olun.")
 
-    /* Hata kutusu (st.error) için opak, koyu kırmızı arka plan */
-    [data-testid="stError"] {{
-        background-color: #5f1010; /* Koyu Kırmızı */
-        color: white;
-        border: 1px solid #5f1010;
-    }}
-    </style>
-    """,
-    unsafe_allow_html=True
-    )
 
 # --- Sayfa Yapılandırması ve Başlık ---
 st.set_page_config(page_title="Gelişmiş Mesafe ve Lokasyon Analiz Aracı", layout="wide")
 
-# Arka plan resmini ve stilleri uygula
-add_bg_from_local('arkaplan.jpg')
+# Arka plan resmini ve yeni stilleri uygula
+apply_custom_styling('arkplan.jpg')
 
 st.title("🗺️ Gelişmiş Mesafe ve Lokasyon Analiz Aracı")
 st.info(
@@ -104,12 +107,10 @@ if not api_key:
 @st.cache_resource
 def get_clients(key):
     """API anahtarına göre geopy ve openrouteservice istemcilerini oluşturur."""
-    # Nominatim'in user_agent'ının her oturumda benzersiz olması iyi bir pratiktir.
     geolocator = Nominatim(user_agent=f"streamlit_geolocator_app_{st.session_state.session_id}")
     ors_client = openrouteservice.Client(key=key)
     return geolocator, ors_client
 
-# Her kullanıcı oturumu için benzersiz bir ID oluştur (user_agent için)
 if 'session_id' not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
@@ -122,12 +123,11 @@ def temizle_lokasyon_adi(text):
         return None
     text = text.strip()
     text = re.sub(r'\bmerkez\b|\bbelediyesi\b|\bbelediye\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\(.*\)', '', text) # Parantez içlerini temizle
-    text = re.sub(r'\s{2,}', ' ', text).strip() # Çift boşlukları teke indir
+    text = re.sub(r'\(.*\)', '', text)
+    text = re.sub(r'\s{2,}', ' ', text).strip()
     return text.title()
 
 
-# Adres ayrıştırma için Türkiye'nin 81 ilini içeren set.
 TURKISH_CITIES = {
     'Adana', 'Adıyaman', 'Afyonkarahisar', 'Ağrı', 'Amasya', 'Ankara', 'Antalya', 'Artvin', 'Aydın',
     'Balıkesir', 'Bilecik', 'Bingöl', 'Bitlis', 'Bolu', 'Burdur', 'Bursa', 'Çanakkale', 'Çankırı',
@@ -143,108 +143,73 @@ TURKISH_CITIES = {
 
 @st.cache_data
 def get_city_district(_geolocator, lat, lon, retries=3):
-    """
-    Verilen koordinatlar için il ve ilçe bilgisini alır. (En Gelişmiş Versiyon)
-    - Standart anahtarları arar.
-    - Bulamazsa, 'display_name' alanını ayrıştırır.
-    - Kısmi sonuçları ve coğrafi bölgeleri yedek olarak kullanır.
-    """
     for attempt in range(retries):
         try:
-            sleep(1.1) # API limitlerine uymak için bekle
+            sleep(1.1)
             location = _geolocator.reverse((lat, lon), language='tr', timeout=20)
-            
             if not location or not location.raw:
                 continue
-
             address = location.raw.get('address', {})
             city, district = None, None
-
-            # 1. Standart metodlarla il ve ilçe ara
             raw_city = address.get('province') or address.get('state')
             raw_district = (address.get('town') or address.get('county') or 
                             address.get('municipality') or address.get('city_district') or 
                             address.get('district') or address.get('suburb') or address.get('village'))
-            
             city = temizle_lokasyon_adi(raw_city)
             district = temizle_lokasyon_adi(raw_district)
-
-            # 2. Yedek Plan: 'display_name'i ayrıştır
             if not city or not district:
                 display_name = location.raw.get('display_name', '')
                 parts = [temizle_lokasyon_adi(p) for p in display_name.split(',')]
-                
-                found_city_from_parts = None
-                for part in parts:
-                    if part in TURKISH_CITIES:
-                        found_city_from_parts = part
-                        break
-                
+                found_city_from_parts = next((p for p in parts if p in TURKISH_CITIES), None)
                 if not city and found_city_from_parts:
                     city = found_city_from_parts
-
                 if not district and city and city in parts:
                     city_index = parts.index(city)
                     if city_index > 0:
                         potential_district = parts[city_index - 1]
                         if potential_district != city and "Bölgesi" not in potential_district:
                             district = potential_district
-            
-            # 3. Sonuçları Değerlendir ve Döndür (En Esnek Adım)
             if city and district:
                 return (city, "Merkez") if city == district else (city, district)
-            
             if district:
                 region = temizle_lokasyon_adi(address.get('region'))
                 final_city = city or region or "İl Bilinmiyor"
                 return final_city, district
-            
             if city:
                 return city, "İlçe Bilinmiyor"
-
         except (GeocoderTimedOut, GeocoderServiceError) as e:
             st.warning(f"Adres bulma hatası (Lat: {lat}, Lon: {lon}) - Deneme {attempt + 1}/{retries}. Hata: {e}")
-            sleep(2) # Hata sonrası daha uzun bekle
+            sleep(2)
         except Exception as e:
             st.error(f"Beklenmedik bir adres bulma hatası oluştu (Lat: {lat}, Lon: {lon}): {e}")
             return "Hata", "Hata"
-            
     st.error(f"Adres bulunamadı (Lat: {lat}, Lon: {lon}) - Tüm denemeler başarısız.")
     return "Bulunamadı", "Bulunamadı"
 
 
 def hesapla_mesafeler(row):
-    """Tek bir satır için lineer ve reel yol mesafesini hesaplar."""
     try:
         vaka_koord = (row['VAKA Lat'], row['VAKA Long'])
         bayi_koord = (row['Bayi Enlem'], row['Bayi Boylam'])
-
         if not all(isinstance(c, (int, float)) for c in vaka_koord + bayi_koord):
             return pd.NA, pd.NA
-            
         lineer_mesafe = round(geodesic(vaka_koord, bayi_koord).km, 2)
-        
         start_coords = (row['VAKA Long'], row['VAKA Lat'])
         end_coords = (row['Bayi Boylam'], row['Bayi Enlem'])
-        
         response = ors_client.directions(
             coordinates=[start_coords, end_coords],
-            profile='driving-car',
-            format='geojson',
-            preference='fastest', # 'recommended' olarak da denenebilir
-            radiuses=[1000, 1000]
+            profile='driving-car', format='geojson',
+            preference='fastest', radiuses=[1000, 1000]
         )
         mesafe_metre = response['features'][0]['properties']['segments'][0]['distance']
         reel_mesafe = round(mesafe_metre / 1000, 2)
-        
         return lineer_mesafe, reel_mesafe
     except openrouteservice.exceptions.ApiError:
         try:
             lineer_mesafe = round(geodesic((row['VAKA Lat'], row['VAKA Long']), (row['Bayi Enlem'], row['Bayi Boylam'])).km, 2)
             st.warning(f"Rota bulunamadı (Satır {row.name}). Karayolu bağlantısı olmayabilir.")
             return lineer_mesafe, pd.NA
-        except:
-             return pd.NA, pd.NA
+        except: return pd.NA, pd.NA
     except Exception as e:
         st.warning(f"Mesafe hesaplama hatası (Satır {row.name}): {e}")
         return pd.NA, pd.NA
@@ -316,5 +281,3 @@ if uploaded_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
-
-
