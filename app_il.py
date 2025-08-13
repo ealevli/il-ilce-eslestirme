@@ -38,11 +38,11 @@ def apply_custom_styling(image_file):
 
                 /* Bilgi kutusu (st.info) için opak mavi arka plan ve beyaz yazı */
                 [data-testid="stInfo"] {{
-                    background-color: #1565C0 !important;
+                    background-color: #040b16 !important;
                     border: 1px solid #0E2A54;
                     border-radius: 0.5rem;
                     padding: 1rem;
-                    color: white !important;
+                    color: black !important;
                 }}
                 [data-testid="stInfo"] p {{
                     color: white !important;
@@ -258,5 +258,6 @@ if uploaded_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
+
 
 
