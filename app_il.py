@@ -19,6 +19,7 @@ def add_bg_from_local(image_file):
     st.markdown(
     f"""
     <style>
+    /* Ana Arka Plan Ayarları */
     .stApp {{
         background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url(data:image/{"jpg"};base64,{encoded_string});
         background-size: cover;
@@ -26,13 +27,40 @@ def add_bg_from_local(image_file):
         background-attachment: fixed;
         background-position: center;
     }}
+    
     /* Sidebar'ı daha okunaklı yapmak için yarı şeffaf arka plan */
     [data-testid="stSidebar"] > div:first-child {{
         background-color: rgba(38, 39, 48, 0.8);
     }}
-    /* Tabloların ve diğer ana elementlerin okunabilirliğini artırmak */
-    .stDataFrame, .stTextInput, .stButton, .stFileUploader {{
-        background-color: rgba(255, 255, 255, 0.05);
+
+    /* --- YENİ EKLENEN KISIM: BİLDİRİM KUTULARI İÇİN STİLLER --- */
+
+    /* Bilgi kutusu (st.info) için opak, koyu mavi arka plan */
+    [data-testid="stInfo"] {{
+        background-color: #0E2A54; /* Koyu Mavi */
+        color: white; /* Beyaz yazı rengi */
+        border: 1px solid #0E2A54;
+    }}
+
+    /* Başarı kutusu (st.success) için opak, koyu yeşil arka plan */
+    [data-testid="stSuccess"] {{
+        background-color: #05380b; /* Koyu Yeşil */
+        color: white;
+        border: 1px solid #05380b;
+    }}
+
+    /* Uyarı kutusu (st.warning) için opak, koyu turuncu arka plan */
+    [data-testid="stWarning"] {{
+        background-color: #7B341E; /* Koyu Turuncu/Kiremit */
+        color: white;
+        border: 1px solid #7B341E;
+    }}
+
+    /* Hata kutusu (st.error) için opak, koyu kırmızı arka plan */
+    [data-testid="stError"] {{
+        background-color: #5f1010; /* Koyu Kırmızı */
+        color: white;
+        border: 1px solid #5f1010;
     }}
     </style>
     """,
@@ -288,4 +316,5 @@ if uploaded_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
+
 
