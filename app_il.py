@@ -13,7 +13,7 @@ import base64 # Resim için gerekli
 def apply_custom_styling(image_file):
     """
     Lokal bir dosyadan Base64 formatında arka plan resmi ekler ve
-    tüm içeriği okunabilir hale getirmek için stil ayarları yapar.
+    başlık ile bilgi kutusunu okunabilir hale getirmek için stil ayarları yapar.
     """
     try:
         with open(image_file, "rb") as f:
@@ -30,34 +30,23 @@ def apply_custom_styling(image_file):
             background-position: center;
         }}
 
-        /* --- OKUNABİLİRLİK İÇİN GARANTİLİ YÖNTEM --- */
-
         /* Başlık için okunabilirliği artıran gölge efekti */
         h1 {{
             color: #FFFFFF;
-            text-shadow: 2px 2px 8px rgba(0,0,0,0.8);
-        }}
-
-        /* Ana içerik alanı için yarı şeffaf "cam panel" efekti */
-        [data-testid="stAppViewContainer"] > .main .block-container {{
-            background-color: rgba(10, 15, 25, 0.85); /* Koyu lacivert, yarı şeffaf */
-            padding: 2rem;
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-        }}
-
-        /* Sidebar'ı daha okunaklı yapmak */
-        [data-testid="stSidebar"] > div:first-child {{
-            background-color: rgba(10, 15, 25, 0.85);
-            border-right: 1px solid rgba(255, 255, 255, 0.2);
-        }}
-
-        /* Bilgi kutusu (st.info) içindeki metnin rengini beyaz yap */
-        [data-testid="stInfo"] p {{
-             color: #FFFFFF !important;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.9);
         }}
         
+        /* --- BİLGİ KUTUSU İÇİN YENİ VE DOĞRUDAN ÇÖZÜM --- */
+        [data-testid="stInfo"] {{
+            background-color: #0E2A54; /* Koyu Mavi OPAK Arka Plan */
+            border: 1px solid #0E2A54;
+            border-radius: 0.5rem; /* Köşeleri yuvarlat */
+        }}
+        /* Bilgi kutusunun içindeki yazının rengini beyaz yap */
+        [data-testid="stInfo"] p {{
+            color: #FFFFFF !important;
+        }}
+
         </style>
         """,
         unsafe_allow_html=True
@@ -70,7 +59,7 @@ def apply_custom_styling(image_file):
 st.set_page_config(page_title="Gelişmiş Mesafe ve Lokasyon Analiz Aracı", layout="wide")
 
 # Arka plan resmini ve yeni stilleri uygula
-apply_custom_styling('arkaplan.jpg')
+apply_custom_styling('arkplan.jpg')
 
 st.title("🗺️ Gelişmiş Mesafe ve Lokasyon Analiz Aracı")
 st.info(
