@@ -8,7 +8,7 @@ import re
 from io import BytesIO
 from time import sleep
 import uuid
-import base64 # Resim için gerekli
+import base64  # Resim için gerekli
 
 def apply_custom_styling(image_file):
     """
@@ -35,24 +35,18 @@ def apply_custom_styling(image_file):
             color: #FFFFFF;
             text-shadow: 2px 2px 8px rgba(0,0,0,0.9);
         }}
-        
-        /* --- BİLGİ KUTUSU İÇİN YENİ VE DOĞRUDAN ÇÖZÜM --- */
-        [data-testid="stInfo"] {
-    background-color: rgba(14, 42, 84, 0.9);  /* %90 opaklık */
-    color: white !important;                /* Yazıyı beyaz yap */
-    border: 1px solid #ffffff22;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    box-shadow: 0 0 10px rgba(0,0,0,0.5);   /* Gölge efekti */
-    backdrop-filter: blur(2px);            /* Hafif arkaplan bulanıklığı */
-}
-[data-testid="stInfo"] p {
-    color: white !important;
-    font-weight: 500;
-}
 
+        /* Bilgi kutusunun görünürlüğünü artır */
+        [data-testid="stInfo"] {{
+            background-color: rgba(14, 42, 84, 0.85);  /* Yarı saydam koyu mavi */
+            border: 1px solid #0E2A54;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            color: white !important;
         }}
-
+        [data-testid="stInfo"] p {{
+            color: white !important;
+        }}
         </style>
         """,
         unsafe_allow_html=True
@@ -65,7 +59,7 @@ def apply_custom_styling(image_file):
 st.set_page_config(page_title="Gelişmiş Mesafe ve Lokasyon Analiz Aracı", layout="wide")
 
 # Arka plan resmini ve yeni stilleri uygula
-apply__styling('arkaplan.jpg')
+apply_custom_styling('arkaplan.jpg')
 
 st.title("🗺️ Gelişmiş Mesafe ve Lokasyon Analiz Aracı")
 st.info(
@@ -91,9 +85,6 @@ if not api_key:
     st.warning("Lütfen devam etmek için sol menüden OpenRouteService API anahtarınızı girin.")
     st.stop()
 
-
-# --- Fonksiyonlar ---
-
 @st.cache_resource
 def get_clients(key):
     geolocator = Nominatim(user_agent=f"streamlit_geolocator_app_{st.session_state.session_id}")
@@ -105,7 +96,6 @@ if 'session_id' not in st.session_state:
 
 geolocator, ors_client = get_clients(api_key)
 
-
 def temizle_lokasyon_adi(text):
     if not isinstance(text, str):
         return None
@@ -114,7 +104,6 @@ def temizle_lokasyon_adi(text):
     text = re.sub(r'\(.*\)', '', text)
     text = re.sub(r'\s{2,}', ' ', text).strip()
     return text.title()
-
 
 TURKISH_CITIES = {
     'Adana', 'Adıyaman', 'Afyonkarahisar', 'Ağrı', 'Amasya', 'Ankara', 'Antalya', 'Artvin', 'Aydın',
@@ -173,7 +162,6 @@ def get_city_district(_geolocator, lat, lon, retries=3):
             return "Hata", "Hata"
     st.error(f"Adres bulunamadı (Lat: {lat}, Lon: {lon}) - Tüm denemeler başarısız.")
     return "Bulunamadı", "Bulunamadı"
-
 
 def hesapla_mesafeler(row):
     try:
@@ -269,5 +257,3 @@ if uploaded_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
-
-
