@@ -8,9 +8,43 @@ import re
 from io import BytesIO
 from time import sleep
 import uuid
+import base64 # Resim için eklendi
+
+def add_bg_from_local(image_file):
+    """
+    Lokal bir dosyadan Base64 formatında arka plan resmi ekler ve okunabilirlik için stil ayarları yapar.
+    """
+    with open(image_file, "rb") as image_file:
+        encoded_string = base64.b64encode(image_file.read()).decode()
+    st.markdown(
+    f"""
+    <style>
+    .stApp {{
+        background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url(data:image/{"jpg"};base64,{encoded_string});
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+        background-position: center;
+    }}
+    /* Sidebar'ı daha okunaklı yapmak için yarı şeffaf arka plan */
+    [data-testid="stSidebar"] > div:first-child {{
+        background-color: rgba(38, 39, 48, 0.8);
+    }}
+    /* Tabloların ve diğer ana elementlerin okunabilirliğini artırmak */
+    .stDataFrame, .stTextInput, .stButton, .stFileUploader {{
+        background-color: rgba(255, 255, 255, 0.05);
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True
+    )
 
 # --- Sayfa Yapılandırması ve Başlık ---
 st.set_page_config(page_title="Gelişmiş Mesafe ve Lokasyon Analiz Aracı", layout="wide")
+
+# Arka plan resmini ve stilleri uygula
+add_bg_from_local('arkplan.jpg')
+
 st.title("🗺️ Gelişmiş Mesafe ve Lokasyon Analiz Aracı")
 st.info(
     "Bu uygulama, yüklediğiniz Excel dosyasındaki 'VAKA' ve 'Bayi' koordinatları arasında kuş uçuşu ve karayolu mesafesini hesaplar. "
@@ -169,7 +203,7 @@ def hesapla_mesafeler(row):
             coordinates=[start_coords, end_coords],
             profile='driving-car',
             format='geojson',
-            preference='fastest',
+            preference='fastest', # 'recommended' olarak da denenebilir
             radiuses=[1000, 1000]
         )
         mesafe_metre = response['features'][0]['properties']['segments'][0]['distance']
@@ -254,4 +288,3 @@ if uploaded_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
-
