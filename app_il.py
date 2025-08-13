@@ -13,7 +13,7 @@ import base64 # Resim için gerekli
 def apply_custom_styling(image_file):
     """
     Lokal bir dosyadan Base64 formatında arka plan resmi ekler ve
-    tüm ana içerik alanını okunabilir hale getirmek için stil ayarları yapar.
+    tüm içeriği okunabilir hale getirmek için stil ayarları yapar.
     """
     try:
         with open(image_file, "rb") as f:
@@ -30,7 +30,14 @@ def apply_custom_styling(image_file):
             background-position: center;
         }}
 
-        /* --- YENİ VE GARANTİLİ YÖNTEM --- */
+        /* --- OKUNABİLİRLİK İÇİN GARANTİLİ YÖNTEM --- */
+
+        /* Başlık için okunabilirliği artıran gölge efekti */
+        h1 {{
+            color: #FFFFFF;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.8);
+        }}
+
         /* Ana içerik alanı için yarı şeffaf "cam panel" efekti */
         [data-testid="stAppViewContainer"] > .main .block-container {{
             background-color: rgba(10, 15, 25, 0.85); /* Koyu lacivert, yarı şeffaf */
@@ -46,22 +53,11 @@ def apply_custom_styling(image_file):
             border-right: 1px solid rgba(255, 255, 255, 0.2);
         }}
 
-        /* Tüm metin renklerini beyaz yaparak okunabilirliği artır */
-        h1, h2, h3, h4, h5, h6, p, .st-emotion-cache-16idsys p, label {{
-            color: #FFFFFF !important;
+        /* Bilgi kutusu (st.info) içindeki metnin rengini beyaz yap */
+        [data-testid="stInfo"] p {{
+             color: #FFFFFF !important;
         }}
         
-        /* Buton ve diğer elementlerin stillerini ayarla */
-        .stButton>button {{
-            color: #FFFFFF;
-            background-color: #007bff;
-            border: none;
-        }}
-        .stButton>button:hover {{
-            background-color: #0056b3;
-            color: #FFFFFF;
-        }}
-
         </style>
         """,
         unsafe_allow_html=True
@@ -85,7 +81,6 @@ st.info(
 # --- API Anahtarı Yönetimi ---
 st.sidebar.header("Ayarlar")
 try:
-    # Streamlit secrets'tan anahtar okuma (deploy edildiğinde kullanılır)
     default_key = st.secrets.get("ORS_KEY", "")
 except (FileNotFoundError, AttributeError):
     default_key = ""
@@ -106,7 +101,6 @@ if not api_key:
 
 @st.cache_resource
 def get_clients(key):
-    """API anahtarına göre geopy ve openrouteservice istemcilerini oluşturur."""
     geolocator = Nominatim(user_agent=f"streamlit_geolocator_app_{st.session_state.session_id}")
     ors_client = openrouteservice.Client(key=key)
     return geolocator, ors_client
@@ -118,7 +112,6 @@ geolocator, ors_client = get_clients(api_key)
 
 
 def temizle_lokasyon_adi(text):
-    """İl veya ilçe adlarındaki istenmeyen ifadeleri temizler ve formatlar."""
     if not isinstance(text, str):
         return None
     text = text.strip()
@@ -281,4 +274,3 @@ if uploaded_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
-
