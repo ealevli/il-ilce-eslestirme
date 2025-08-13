@@ -37,14 +37,20 @@ def apply_custom_styling(image_file):
         }}
         
         /* --- BİLGİ KUTUSU İÇİN YENİ VE DOĞRUDAN ÇÖZÜM --- */
-        [data-testid="stInfo"] {{
-            background-color: #0E2A54; /* Koyu Mavi OPAK Arka Plan */
-            border: 1px solid #0E2A54;
-            border-radius: 0.5rem; /* Köşeleri yuvarlat */
-        }}
-        /* Bilgi kutusunun içindeki yazının rengini beyaz yap */
-        [data-testid="stInfo"] p {{
-            color: #FFFFFF !important;
+        [data-testid="stInfo"] {
+    background-color: rgba(14, 42, 84, 0.9);  /* %90 opaklık */
+    color: white !important;                /* Yazıyı beyaz yap */
+    border: 1px solid #ffffff22;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);   /* Gölge efekti */
+    backdrop-filter: blur(2px);            /* Hafif arkaplan bulanıklığı */
+}
+[data-testid="stInfo"] p {
+    color: white !important;
+    font-weight: 500;
+}
+
         }}
 
         </style>
@@ -59,7 +65,7 @@ def apply_custom_styling(image_file):
 st.set_page_config(page_title="Gelişmiş Mesafe ve Lokasyon Analiz Aracı", layout="wide")
 
 # Arka plan resmini ve yeni stilleri uygula
-apply_custom_styling('arkaplan.jpg')
+apply__styling('arkaplan.jpg')
 
 st.title("🗺️ Gelişmiş Mesafe ve Lokasyon Analiz Aracı")
 st.info(
@@ -263,4 +269,5 @@ if uploaded_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
+
 
